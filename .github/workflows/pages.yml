@@ -84,7 +84,7 @@ jobs:
         run: |
           if [ -n "$BUILD_ENV" ]; then
             while IFS= read -r line; do
-              [ -n "$line" ] && export "$line"
+              [ -n "$line" ] && export "${line?}"
             done <<< "$BUILD_ENV"
           fi
           ${{ inputs.build-command }}
