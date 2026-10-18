@@ -1,0 +1,76 @@
+name: Cloudflare Worker
+
+# Reusable: deploy a Cloudflare Worker with the wrangler version the project
+# pins. Pull requests run a dry-run deploy (bundles the Worker, no secrets
+# needed) as their check; pushes and manual runs run pre-deploy (e.g. D1
+# migrations) and then deploy.
+
+on:
+  workflow_call:
+    inputs:
+      account-id:
+        description: Cloudflare account ID (or pass the CLOUDFLARE_ACCOUNT_ID secret)
+        type: string
+        default: ''
+      working-directory:
+        type: string
+        default: .
+      node-version:
+        type: string
+        default: '22'
+      install-command:
+        type: string
+        default: npm ci
+      pre-deploy:
+        description: Commands to run before deploying, with the Cloudflare credentials set (e.g. npx wrangler d1 migrations apply DB --remote)
+        type: string
+        default: ''
+      deploy-args:
+        description: Extra arguments for wrangler deploy (e.g. --env production)
+        type: string
+        default: ''
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: false
+      CLOUDFLARE_ACCOUNT_ID:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || inputs.account-id }}
+      DEPLOY_ARGS: ${{ inputs.deploy-args }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install
+        run: ${{ inputs.install-command }}
+
+      - name: Dry run
+        if: github.event_name == 'pull_request'
+        run: npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker" $DEPLOY_ARGS
+
+      - name: Pre-deploy
+        if: github.event_name != 'pull_request' && inputs.pre-deploy != '' && env.CLOUDFLARE_API_TOKEN != ''
+        run: ${{ inputs.pre-deploy }}
+
+      - name: Deploy
+        if: github.event_name != 'pull_request' && env.CLOUDFLARE_API_TOKEN != ''
+        run: npx wrangler deploy $DEPLOY_ARGS
+
+      - name: Say why nothing deployed
+        if: github.event_name != 'pull_request' && env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::warning::No CLOUDFLARE_API_TOKEN secret, so the Worker was not deployed."
