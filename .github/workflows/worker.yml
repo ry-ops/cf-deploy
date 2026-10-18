@@ -61,7 +61,9 @@ jobs:
 
       - name: Dry run
         if: github.event_name == 'pull_request'
-        run: npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker" $DEPLOY_ARGS
+        run: |
+          read -ra args <<< "$DEPLOY_ARGS"
+          npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker" "${args[@]}"
 
       - name: Pre-deploy
         if: github.event_name != 'pull_request' && inputs.pre-deploy != '' && env.CLOUDFLARE_API_TOKEN != ''
@@ -69,7 +71,9 @@ jobs:
 
       - name: Deploy
         if: github.event_name != 'pull_request' && env.CLOUDFLARE_API_TOKEN != ''
-        run: npx wrangler deploy $DEPLOY_ARGS
+        run: |
+          read -ra args <<< "$DEPLOY_ARGS"
+          npx wrangler deploy "${args[@]}"
 
       - name: Say why nothing deployed
         if: github.event_name != 'pull_request' && env.CLOUDFLARE_API_TOKEN == ''
