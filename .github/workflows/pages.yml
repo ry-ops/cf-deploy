@@ -81,6 +81,9 @@ jobs:
       - name: Build
         env:
           BUILD_ENV: ${{ inputs.build-env }}
+          # Read-only token for the calling repo, so build-time GitHub API
+          # calls (live star counts and the like) aren't rate-limited.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ -n "$BUILD_ENV" ]; then
             while IFS= read -r line; do
